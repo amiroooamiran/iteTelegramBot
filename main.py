@@ -75,11 +75,16 @@ while True:
             print(f"Received message '{message_text}' from chat ID {chat_id}")
 
             if not (first_name and last_name and user_id):
-                reply_message = f"Please update your Telegram profile with your first name, last name, and username.\nUser ID: @{user_id}\n{authentication_link}"
+                reply_message = f"کاربر گرامی لطفا تصویر پروفایل خود را با یک عکس سلفی از خودتان جایگذین کنید و نام و فامیلی خود را نیز در پرفایل خود بگذارید . \n کاربر گرامی این کار برای امنیت شما کاربران گروه است. \nUser ID: @{user_id}\n{authentication_link}"
                 reply_url = f"https://api.telegram.org/bot{telegram_bot_token}/sendMessage"
                 reply_params = {'chat_id': chat_id, 'text': reply_message, 'reply_to_message_id': message_id}
-                requests.get(reply_url, params=reply_params)
+                response = requests.get(reply_url, params=reply_params)
                 requests.get(f"https://api.telegram.org/bot{telegram_bot_token}/deleteMessage", params={'chat_id': chat_id, 'message_id': message_id})
+                            # Schedule deletion of reply_message after 10 seconds
+                if response.status_code == 200:
+                    time.sleep(15)
+                    delete_params = {'chat_id': chat_id, 'message_id': response.json().get('result', {}).get('message_id')}
+                    requests.get(f"https://api.telegram.org/bot{telegram_bot_token}/deleteMessage", params=delete_params)
             else:
                 if user_id in users_data_sent_to_admin:
                     print(f"Data for user {user_id} has already been sent to admin.")
