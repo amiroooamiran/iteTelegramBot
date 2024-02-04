@@ -3,6 +3,8 @@ import time
 
 telegram_bot_token = "6527497624:AAFrw5CxRcGtAPUYfr3T1yY7-gY-0iosK7c"
 target_group_chat_id = -1002095021922  # Replace with the actual ID of your group chat (prefixed with -100)
+second_group_chat_id = -1002007424956
+second_group_invite_link = "https://t.me/ite_test_second"
 
 authentication_link = "https://t.me/itegroup_bot"
 latest_processed_message_id = 0
@@ -57,6 +59,28 @@ def get_user_profile_photos(user_id):
     response = requests.post(url, json=payload, headers=headers)
     return response.json()
 
+
+def check_group_membership(user_id):
+    chat_member_url = f"https://api.telegram.org/bot{telegram_bot_token}/getChatMember"
+    params = {'chat_id': second_group_chat_id, 'user_id': user_id}
+    response = requests.get(chat_member_url, params=params)
+
+    if response.status_code == 200:
+        result = response.json().get('result', {})
+        status = result.get('status')
+        return status == 'member'
+    else:
+        print(f"Error checking group membership: {response.status_code}")
+        return False
+
+# Function to send a message to a chat
+def send_message(chat_id, text, reply_to_message_id=None):
+    send_message_url = f"https://api.telegram.org/bot{telegram_bot_token}/sendMessage"
+    send_message_params = {'chat_id': chat_id, 'text': text, 'reply_to_message_id': reply_to_message_id}
+    response = requests.get(send_message_url, params=send_message_params)
+    return response
+
+
 while True:
     updates = get_updates(offset=latest_processed_message_id)
 
@@ -69,7 +93,7 @@ while True:
         message_text = update.get('message', {}).get('text')
         message_id = update.get('message', {}).get('message_id')
 
-        admin_id = '358040589'
+        admin_id = 'YOUR_ADMIN_ID'
 
         if chat_id == target_group_chat_id and message_id > latest_processed_message_ids.get(chat_id, 0):
             print(f"Received message '{message_text}' from chat ID {chat_id}")
@@ -80,7 +104,8 @@ while True:
                 reply_params = {'chat_id': chat_id, 'text': reply_message, 'reply_to_message_id': message_id}
                 response = requests.get(reply_url, params=reply_params)
                 requests.get(f"https://api.telegram.org/bot{telegram_bot_token}/deleteMessage", params={'chat_id': chat_id, 'message_id': message_id})
-                            # Schedule deletion of reply_message after 10 seconds
+                
+                # Schedule deletion of reply_message after 10 seconds
                 if response.status_code == 200:
                     time.sleep(15)
                     delete_params = {'chat_id': chat_id, 'message_id': response.json().get('result', {}).get('message_id')}
@@ -100,17 +125,27 @@ while True:
                             response = requests.post(send_photo_url, files=files, data=send_photo_params)
                             if response.status_code != 200:
                                 print("Error sending photo.")
-                            else:
-                                # Store user data to prevent sending it again to admin
-                                users_data_sent_to_admin[user_id] = True
+                                # Check if user is a member of the second group
+                                if check_group_membership(user_info['id']):
+                                    # Send confirmation message to user
+                                    confirmation_message = "شما به گروه پیوستید. خوش آمدید!"
+                                    confirmation_url = f"https://api.telegram.org/bot{telegram_bot_token}/sendMessage"
+                                    confirmation_params = {'chat_id': chat_id, 'text': confirmation_message}
+                                    send_message(chat_id, confirmation_message)
+                                    # Store user data to prevent sending it again to admin
+                                    users_data_sent_to_admin[user_id] = True
+                                else:
+                                    # Send message with invite link to the second group
+                                    invite_message = f"ممکن است سوالاتی داشته باشید قبل از مطرح کردنشان ابتدا باید در گروه زیر عضو بشوید و سوالات متاول را در آنجا بخوانید و ریاکشن بزنید \n ({second_group_invite_link}) استفاده کنید."
+                                    send_message(chat_id, invite_message)
+                                    # Delete the original message
+                                    requests.get(f"https://api.telegram.org/bot{telegram_bot_token}/deleteMessage", params={'chat_id': chat_id, 'message_id': message_id})
                     else:
+                        # Send message requesting profile photo upload
                         reply_message = f"Please upload your profile photo.\nUser ID: @{user_id}\n{authentication_link}"
-                        reply_url = f"https://api.telegram.org/bot{telegram_bot_token}/sendMessage"
-                        reply_params = {'chat_id': chat_id, 'text': reply_message, 'reply_to_message_id': message_id}
-                        requests.get(reply_url, params=reply_params)
+                        send_message(chat_id, reply_message, message_id)
+                        # Delete the original message
                         requests.get(f"https://api.telegram.org/bot{telegram_bot_token}/deleteMessage", params={'chat_id': chat_id, 'message_id': message_id})
-
-            latest_processed_message_ids[chat_id] = message_id
 
     if updates:
         latest_processed_message_id = max(update.get('update_id') for update in updates) + 1
