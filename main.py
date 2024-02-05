@@ -12,6 +12,7 @@ latest_processed_message_ids = {}
 
 # Dictionary to store information about users whose data has been sent to admin
 users_data_sent_to_admin = {}
+users_informed = {}
 
 def get_updates(offset=None):
     telegram_api_url = f"https://api.telegram.org/bot{telegram_bot_token}/getUpdates"
@@ -81,6 +82,16 @@ def send_message(chat_id, text, reply_to_message_id=None):
     return response
 
 
+def get_chat_administrators(chat_id):
+    url = f"https://api.telegram.org/bot{telegram_bot_token}/getChatAdministrators"
+    params = {'chat_id': chat_id}
+    response = requests.get(url, params=params)
+    if response.status_code == 200:
+        return response.json().get('result', [])
+    else:
+        print("Error getting chat administrators.")
+        return []
+    
 while True:
     updates = get_updates(offset=latest_processed_message_id)
 
@@ -99,17 +110,57 @@ while True:
             print(f"Received message '{message_text}' from chat ID {chat_id}")
 
             if not (first_name and last_name and user_id):
-                reply_message = f"کاربر گرامی لطفا تصویر پروفایل خود را با یک عکس سلفی از خودتان جایگذین کنید و نام و فامیلی خود را نیز در پرفایل خود بگذارید . \n کاربر گرامی این کار برای امنیت شما کاربران گروه است. \nUser ID: @{user_id}\n{authentication_link}"
-                reply_url = f"https://api.telegram.org/bot{telegram_bot_token}/sendMessage"
-                reply_params = {'chat_id': chat_id, 'text': reply_message, 'reply_to_message_id': message_id}
-                response = requests.get(reply_url, params=reply_params)
-                requests.get(f"https://api.telegram.org/bot{telegram_bot_token}/deleteMessage", params={'chat_id': chat_id, 'message_id': message_id})
+                # Check if the user is an admin
+                admins = get_chat_administrators(chat_id)
+                user_is_admin = any(admin['user']['id'] == user_info['id'] for admin in admins)
                 
-                # Schedule deletion of reply_message after 10 seconds
-                if response.status_code == 200:
-                    time.sleep(15)
-                    delete_params = {'chat_id': chat_id, 'message_id': response.json().get('result', {}).get('message_id')}
-                    requests.get(f"https://api.telegram.org/bot{telegram_bot_token}/deleteMessage", params=delete_params)
+                if not user_is_admin:
+                    # Send warning message and restrict user's permissions
+                    reply_message = f"کاربر گرامی لطفا تصویر پروفایل خود را با یک عکس سلفی از خودتان جایگذین کنید و نام و فامیلی خود را نیز در پرفایل خود بگذارید . \n کاربر گرامی این کار برای امنیت شما کاربران گروه است. \nUser ID: @{user_id}\n{authentication_link}"
+                    reply_url = f"https://api.telegram.org/bot{telegram_bot_token}/sendMessage"
+                    reply_params = {'chat_id': chat_id, 'text': reply_message, 'reply_to_message_id': message_id}
+                    response = requests.get(reply_url, params=reply_params)
+                    requests.get(f"https://api.telegram.org/bot{telegram_bot_token}/deleteMessage", params={'chat_id': chat_id, 'message_id': message_id})
+                    
+                    # Schedule deletion of reply_message after 10 seconds
+                    if response.status_code == 200:
+                        time.sleep(15)
+                        delete_params = {'chat_id': chat_id, 'message_id': response.json().get('result', {}).get('message_id')}
+                        requests.get(f"https://api.telegram.org/bot{telegram_bot_token}/deleteMessage", params=delete_params)
+                        
+                        # Restrict user's permissions
+                        restrict_params = {
+                            'chat_id': chat_id,
+                            'user_id': user_info['id'],
+                            'permissions': {
+                                'can_send_messages': False,
+                                'can_send_media_messages': False,
+                                'can_send_polls': False,
+                                'can_send_other_messages': False,
+                                'can_add_web_page_previews': False,
+                                'can_change_info': False,
+                                'can_invite_users': False,
+                                'can_pin_messages': False
+                            }
+                        }
+                        requests.post(f"https://api.telegram.org/bot{telegram_bot_token}/restrictChatMember", json=restrict_params)
+                        
+                        # Check if inform_message has been sent to the user
+                        if user_id not in users_informed:
+                            # Send warning message about voice chat access
+                            inform_message = f"کاربر گرامی شما مجاز به استفاده از تماس صوتی نیستید تا زمانی که اطلاعات مورد نیاز را ارسال نکرده‌اید.\nUser ID: {user_id}"
+                            send_message(chat_id, inform_message)
+                            # Mark user as informed
+                            users_informed[user_id] = True
+                        
+                        # Remove user from group after 5 seconds
+                        time.sleep(10)
+                        if not (first_name and last_name and user_id):
+                            remove_member_params = {
+                                'chat_id': chat_id,
+                                'user_id': user_info['id']
+                            }
+                            requests.post(f"https://api.telegram.org/bot{telegram_bot_token}/kickChatMember", json=remove_member_params)
             else:
                 if user_id in users_data_sent_to_admin:
                     print(f"Data for user {user_id} has already been sent to admin.")
@@ -136,7 +187,7 @@ while True:
                                     users_data_sent_to_admin[user_id] = True
                                 else:
                                     # Send message with invite link to the second group
-                                    invite_message = f"ممکن است سوالاتی داشته باشید قبل از مطرح کردنشان ابتدا باید در گروه زیر عضو بشوید و سوالات متاول را در آنجا بخوانید و ریاکشن بزنید \n ({second_group_invite_link}) استفاده کنید."
+                                    invite_message = f"ممکن است سوالاتی داشته باشید قبل از مطرح کردنشان ابتدا باید در گروه زیر عضو بشویئ ({second_group_invite_link}) استفاده کنید."
                                     send_message(chat_id, invite_message)
                                     # Delete the original message
                                     requests.get(f"https://api.telegram.org/bot{telegram_bot_token}/deleteMessage", params={'chat_id': chat_id, 'message_id': message_id})
