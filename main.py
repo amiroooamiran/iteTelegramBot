@@ -2,7 +2,7 @@ import requests
 import time 
 
 telegram_bot_token = "6527497624:AAFrw5CxRcGtAPUYfr3T1yY7-gY-0iosK7c"
-target_group_chat_id = -1002095021922  # Replace with the actual ID of your group chat (prefixed with -100)
+target_group_chat_id = -1002095021922 
 second_group_chat_id = -1002007424956
 second_group_invite_link = "https://t.me/ite_test_second"
 
