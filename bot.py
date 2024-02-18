@@ -7,6 +7,7 @@ import csv
 TOKEN = "6356574896:AAEBq_cjz9XNvbC7KahWhzmkLXd2ZBMEd6c"
 IMAGES_DIR = 'images'
 USERS_CSV_FILE = 'users.csv'
+ADMIN_ID = 358040589
 
 bot = telebot.TeleBot(TOKEN)
 
@@ -31,7 +32,8 @@ def save_user_info(user_id, first_name, last_name):
             writer.writeheader()
 
         # Encode Unicode characters before writing
-        writer.writerow({'User ID': user_id, 'First Name': first_name, 'Last Name': last_name})
+        writer.writerow({'User ID': user_id, 'First Name': first_name, 'Last Name': last_name if last_name else ''})
+
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -43,20 +45,20 @@ def handle_first_name(message):
     if message.text:
         # Save the first name and prompt for the last name
         bot.send_message(message.chat.id, 'حال فامیلی خود را ارسال کنید.')
-        bot.register_next_step_handler(message, handle_last_name)
+        bot.register_next_step_handler(message, handle_last_name, message.text)  # Pass the first name to the next step
     else:
         bot.send_message(message.chat.id, 'مشکلی پیش آمده لطفا دوباره نام خود را ارسال کنید.')
 
-def handle_last_name(message):
+def handle_last_name(message, first_name):
     if message.text:
         # Save the last name and prompt for the image
-        first_name = message.text
+        last_name = message.text
         user_id = message.from_user.id
 
         bot.send_message(message.chat.id, 'متشکریم, حال تصویر خود را ارسال کنید.')
 
         # Save user info to CSV
-        save_user_info(user_id, first_name, last_name=None)
+        save_user_info(user_id, first_name, last_name)
 
         # Handle receiving the image
         bot.register_next_step_handler(message, handle_image)
@@ -97,15 +99,15 @@ def handle_image(message):
                     last_name = row['Last Name']
                     break
         
-        # If user information is found, update last name and save to CSV
+        # If user information is found, send it to the admin
         if first_name:
-            with open(USERS_CSV_FILE, 'w', newline='', encoding='utf-8') as csvfile:
-                fieldnames = ['User ID', 'First Name', 'Last Name']
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            # Send user information to admin
+            admin_message = f"User ID: {user_id}\nFirst Name: {first_name}\nLast Name: {last_name}"
+            bot.send_message(ADMIN_ID, admin_message)
 
-                writer.writeheader()
-                writer.writerow({'User ID': user_id, 'First Name': first_name, 'Last Name': last_name})
-        
+            # Send the image to the user
+            bot.send_photo(user_id, open(file_name, 'rb'))
+
         bot.send_message(message.chat.id, 'اطلاعات شما با موفقیت ثبت شد, حال میتوانید در گروه فعالبت کنید.')
     else:
         bot.send_message(message.chat.id, 'چهره ایی در تصویر تشخیص داده نشد شما سیع کردید ربات را گول بزنید تا دقایق دیگر از گروه حدف خواهید شد.')
