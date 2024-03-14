@@ -73,7 +73,7 @@ def handle_last_name(message, first_name):
         bot.register_next_step_handler(message, handle_image)
     else:
         bot.send_message(message.chat.id, 'مشکلی پیش آمده لطفا دوباره فامیلی خود را ارسال کنید.')
-        
+
 def is_selfie(image):
     # Load Haar Cascade classifier for face detection
     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
@@ -97,11 +97,13 @@ def is_selfie(image):
         distance = (known_width * focal_length) / per_width
 
         # Accept as selfie if the distance is less than 18 cm
-        if distance < 18:
+        if distance < 15:
             return True
 
     # If none of the detected faces meet the criteria, it's not a selfie
     return False
+
+
 
 @bot.message_handler(content_types=['photo'])
 def handle_image(message):
@@ -148,6 +150,9 @@ def handle_image(message):
                 # Send the image to the admins
                 bot.send_photo(ADMIN_ID_1, open(file_name, 'rb'))
                 bot.send_photo(ADMIN_ID_2, open(file_name, 'rb'))
+
+            # Save user information only if it's a selfie
+            save_user_info(user_id, first_name, last_name)
 
             bot.send_message(message.chat.id, 'اطلاعات شما با موفقیت ثبت شد, حال میتوانید در گروه فعالبت کنید. \n از لینک زیر وارد گروه شوید و پیام بگذارید https://t.me/khodandaaz39')
         else:
