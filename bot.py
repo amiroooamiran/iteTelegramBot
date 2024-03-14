@@ -168,5 +168,9 @@ def handle_other(message):
     if message.content_type != message.text != '/start' or message.text != '/users':
         bot.send_message(message.chat.id, 'لطفا تصویر خود را ارسال کنید')
 
-time.sleep(2)
-bot.polling(none_stop=True)
+while True:
+    try:
+        bot.polling(none_stop=True)
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        time.sleep(15)  # Wait 15 seconds before restarting
