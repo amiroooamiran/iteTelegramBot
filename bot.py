@@ -3,6 +3,7 @@ import telebot
 import cv2
 from telebot import types
 import csv
+import time
 
 TOKEN = "6356574896:AAEBq_cjz9XNvbC7KahWhzmkLXd2ZBMEd6c"
 IMAGES_DIR = 'images'
@@ -14,7 +15,7 @@ bot = telebot.TeleBot(TOKEN)
 
 welcome = """
     کاربر گرامی لطفا ابتدا در دو پیام جداگانه نام و نام خانوادگی خود را مانند مثال زیر ارسال کنید.
-    
+
     رضا
     رضایی
 
@@ -23,6 +24,7 @@ welcome = """
     ⛔ توجه داشته باشید که این بات به سیستم تشخیص چهره مجهز میباشد و اگر سیع کنید آن را فریب دهید شما را بلاک میکند و گزارش شما را به تلگرام ارسال میکند.
     """
 
+print("Bot is running ...")
 def save_user_info(user_id, first_name, last_name):
     with open(USERS_CSV_FILE, 'a', newline='', encoding='utf-8') as csvfile:
         fieldnames = ['User ID', 'First Name', 'Last Name']
@@ -71,6 +73,12 @@ def handle_last_name(message, first_name):
         bot.register_next_step_handler(message, handle_image)
     else:
         bot.send_message(message.chat.id, 'مشکلی پیش آمده لطفا دوباره فامیلی خود را ارسال کنید.')
+def is_selfie(image):
+    height, width, _ = image.shape
+    aspect_ratio = width / height
+    # Define a threshold for aspect ratio to consider it as a selfie
+    selfie_threshold = 0.8  # You can adjust this threshold as needed
+    return aspect_ratio >= selfie_threshold
 
 @bot.message_handler(content_types=['photo'])
 def handle_image(message):
@@ -83,7 +91,7 @@ def handle_image(message):
         os.makedirs(IMAGES_DIR)
 
     file_name = f"{IMAGES_DIR}/{file_id}.png"
-    
+
     with open(file_name, 'wb') as new_file:
         new_file.write(downloaded_file)
 
@@ -92,34 +100,35 @@ def handle_image(message):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
     faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-    
+
     if len(faces) == 1:
-        # Get user information from CSV
-        user_id = message.from_user.id
-        first_name = None
-        last_name = None
-        with open(USERS_CSV_FILE, 'r', newline='', encoding='utf-8') as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                if int(row['User ID']) == user_id:
-                    first_name = row['First Name']
-                    last_name = row['Last Name']
-                    break
-        
-        # If user information is found, send it to the admin
-        if first_name:
-            # Send user information to admin
-            admin_message = f"User ID: {user_id}\nFirst Name: {first_name}\nLast Name: {last_name}"
-            bot.send_message(ADMIN_ID_1, admin_message)
-            bot.send_message(ADMIN_ID_2, admin_message)
+        if is_selfie(image):
+            # Get user information from CSV
+            user_id = message.from_user.id
+            first_name = None
+            last_name = None
+            with open(USERS_CSV_FILE, 'r', newline='', encoding='utf-8') as csvfile:
+                reader = csv.DictReader(csvfile)
+                for row in reader:
+                    if int(row['User ID']) == user_id:
+                        first_name = row['First Name']
+                        last_name = row['Last Name']
+                        break
 
+            # If user information is found, send it to the admin
+            if first_name:
+                # Send user information to admin
+                admin_message = f"User ID: {user_id}\nFirst Name: {first_name}\nLast Name: {last_name}"
+                bot.send_message(ADMIN_ID_1, admin_message)
+                bot.send_message(ADMIN_ID_2, admin_message)
 
-            # Send the image to the admins
-            bot.send_photo(ADMIN_ID_1, open(file_name, 'rb'))
-            bot.send_photo(ADMIN_ID_2, open(file_name, 'rb'))
+                # Send the image to the admins
+                bot.send_photo(ADMIN_ID_1, open(file_name, 'rb'))
+                bot.send_photo(ADMIN_ID_2, open(file_name, 'rb'))
 
-
-        bot.send_message(message.chat.id, 'اطلاعات شما با موفقیت ثبت شد, حال میتوانید در گروه فعالبت کنید. \n از لینک زیر وارد گروه شوید و پیام بگذارید https://t.me/khodandaaz39')
+            bot.send_message(message.chat.id, 'اطلاعات شما با موفقیت ثبت شد, حال میتوانید در گروه فعالبت کنید. \n از لینک زیر وارد گروه شوید و پیام بگذارید https://t.me/khodandaaz39')
+        else:
+            bot.send_message(message.chat.id, 'این تصویر مشخصات یک عکس سلفی را ندارد و بنابراین نام شما ذخیره نشده است.')
     else:
         bot.send_message(message.chat.id, 'چهره ایی در تصویر تشخیص داده نشد شما سیع کردید ربات را گول بزنید تا دقایق دیگر از گروه حدف خواهید شد.')
 
@@ -131,4 +140,5 @@ def handle_other(message):
     if message.content_type != message.text != '/start' or message.text != '/users':
         bot.send_message(message.chat.id, 'لطفا تصویر خود را ارسال کنید')
 
+time.sleep(2)
 bot.polling(none_stop=True)
