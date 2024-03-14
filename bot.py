@@ -22,7 +22,7 @@ welcome = """
     📷 کاربر گرامی لطفا تصویر پروفایل خود را برای ربات ارسال کنید.
 
     ⛔ توجه داشته باشید که این بات به سیستم تشخیص چهره مجهز میباشد و اگر سیع کنید آن را فریب دهید شما را بلاک میکند و گزارش شما را به تلگرام ارسال میکند.
-    """
+"""
 
 print("Bot is running ...")
 def save_user_info(user_id, first_name, last_name):
@@ -73,12 +73,35 @@ def handle_last_name(message, first_name):
         bot.register_next_step_handler(message, handle_image)
     else:
         bot.send_message(message.chat.id, 'مشکلی پیش آمده لطفا دوباره فامیلی خود را ارسال کنید.')
+        
 def is_selfie(image):
-    height, width, _ = image.shape
-    aspect_ratio = width / height
-    # Define a threshold for aspect ratio to consider it as a selfie
-    selfie_threshold = 0.8  # You can adjust this threshold as needed
-    return aspect_ratio >= selfie_threshold
+    # Load Haar Cascade classifier for face detection
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+
+    # Convert the image to grayscale
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    # Detect faces in the grayscale image
+    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+
+    # If no faces detected, it's not a selfie
+    if len(faces) == 0:
+        return False
+
+    # Calculate the distance between the camera and the face
+    # Assuming known width of face (in cm) and focal length of the camera
+    known_width = 14  # in centimeters (example)
+    focal_length = 375.0  # example value
+    for (x, y, w, h) in faces:
+        per_width = w
+        distance = (known_width * focal_length) / per_width
+
+        # Accept as selfie if the distance is less than 18 cm
+        if distance < 18:
+            return True
+
+    # If none of the detected faces meet the criteria, it's not a selfie
+    return False
 
 @bot.message_handler(content_types=['photo'])
 def handle_image(message):
